@@ -1,14 +1,13 @@
 import torch
 import numpy as np
 import SimpleITK as sitk
-
-from data import img_utils
+from data import data_utils
 
 class UnpairedDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
         super().__init__()
-        self.mA_list = sorted(img_utils.make_dataset(f"{dataset_path}/{mA_name}"))
-        self.mB_list =  sorted(img_utils.make_dataset(f"{dataset_path}/{mB_name}"))
+        self.mA_list = sorted(data_utils.make_dataset(f"{dataset_path}/{mA_name}"))
+        self.mB_list =  sorted(data_utils.make_dataset(f"{dataset_path}/{mB_name}"))
         self.downsample_factor = downsample_factor
 
     def __getitem__(self, index):
@@ -19,18 +18,18 @@ class UnpairedDataset(torch.utils.data.Dataset):
         A_img = sitk.ReadImage(A_file_path)
         B_img = sitk.ReadImage(B_file_path)
         if self.downsample_factor >= 2:
-            A_img = img_utils.sitk_downsample(A_img, self.downsample_factor)
-            B_img = img_utils.sitk_downsample(B_img, self.downsample_factor)
-        return [img_utils.sitk_convert_to_tensor(A_img), img_utils.sitk_convert_to_tensor(B_img)]
-    
+            A_img = data_utils.sitk_downsample(A_img, self.downsample_factor)
+            B_img = data_utils.sitk_downsample(B_img, self.downsample_factor)
+        return [data_utils.sitk_to_torch_tensor(A_img), data_utils.sitk_to_torch_tensor(B_img)]
+
     def __len__(self):
         return len(self.mA_list)
 
 class PairedDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
         super().__init__()
-        self.mA_list = sorted(img_utils.make_dataset(f"{dataset_path}/{mA_name}"))
-        self.mB_list =  sorted(img_utils.make_dataset(f"{dataset_path}/{mB_name}"))
+        self.mA_list = sorted(data_utils.make_dataset(f"{dataset_path}/{mA_name}"))
+        self.mB_list =  sorted(data_utils.make_dataset(f"{dataset_path}/{mB_name}"))
         self.downsample_factor = downsample_factor
 
     def __getitem__(self, index):
@@ -41,16 +40,16 @@ class PairedDataset(torch.utils.data.Dataset):
         A_img = sitk.ReadImage(A_file_path)
         B_img = sitk.ReadImage(B_file_path)
         if self.downsample_factor >= 2:
-            A_img = img_utils.sitk_downsample(A_img, self.downsample_factor)
-            B_img = img_utils.sitk_downsample(B_img, self.downsample_factor)
-        return [img_utils.sitk_convert_to_tensor(A_img), img_utils.sitk_convert_to_tensor(B_img)]
-    
+            A_img = data_utils.sitk_downsample(A_img, self.downsample_factor)
+            B_img = data_utils.sitk_downsample(B_img, self.downsample_factor)
+        return [data_utils.sitk_to_torch_tensor(A_img), data_utils.sitk_to_torch_tensor(B_img)]
+
     def __len__(self):
         return len(self.mA_list)
 
 class PatchDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
         super().__init__()
-        self.mA_list = sorted(img_utils.make_dataset(f"{dataset_path}/{mA_name}"))
-        self.mB_list =  sorted(img_utils.make_dataset(f"{dataset_path}/{mB_name}"))
+        self.mA_list = sorted(data_utils.make_dataset(f"{dataset_path}/{mA_name}"))
+        self.mB_list =  sorted(data_utils.make_dataset(f"{dataset_path}/{mB_name}"))
         self.downsample_factor = downsample_factor

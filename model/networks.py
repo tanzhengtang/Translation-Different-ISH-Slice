@@ -307,10 +307,7 @@ def GanCommonModel(LightningModule):
             raise ValueError("Invalid Loss Type!")
     
     def configure_optimizers(self):
-        if hasattr(self.hparams, 'weight_decay'):
-            weight_decay = self.hparams.weight_decay
-        else:
-            weight_decay = 0
+        weight_decay = self.hparams.get('weight_decay', 0)
         g_opt = torch.optim.Adam(self.netG.parameters(), lr = self.hparams.lr, weight_decay = weight_decay)
         d_opt = torch.optim.Adam(self.netD.parameters(), lr = self.hparams.lr, weight_decay = weight_decay)
         if self.hparams.lr_scheduler is not None:
@@ -359,7 +356,8 @@ def GanCommonModel(LightningModule):
         val_loss_dict = {}
         for metric_name in self.hparams.val_metric_names:
             val_loss_dict[metric_name] = METRICS_CLASS_DICT[metric_name](val_g_y.detach(), y)
-        self.log_dict(val_loss_dict, prog_bar = True, on_step = True, logger = True)
+        if val_loss_dict:
+            self.log_dict(val_loss_dict, prog_bar = True, on_step = True, logger = True)
         return val_loss_dict
     
     def test_step(self, batch, batch_idx):

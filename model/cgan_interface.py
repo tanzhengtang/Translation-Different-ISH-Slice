@@ -23,15 +23,13 @@ class CycleGanInterface(networks.GanCommonModel):
             self.netD_A.load_from_ckpt(self.hparams.netD_A_ckpt_path)
         if hasattr(self.hparams.netD_params, 'netD_B_ckpt_path'):
             self.netD_B.load_from_ckpt(self.hparams.netD_B_ckpt_path)
-        if hasattr(self.hparams, 'pool_image_size'):
-            self.fake_A_pool = networks.ImagePool(self.hparams.pool_image_size)
-            self.fake_B_pool = networks.ImagePool(self.hparams.pool_image_size)
-        if hasattr(self.hparams, 'direction'):
-            self.direction = self.hparams.direction
-        else:
-            self.direction = 'AtoB'
+        pool_image_size = self.hparams.get('pool_image_size', 50)
+        self.fake_A_pool = networks.ImagePool(pool_image_size)
+        self.fake_B_pool = networks.ImagePool(pool_image_size)
+        self.direction = self.hyparams.get('direction', 'AtoB')
+        if self.direction == 'AtoB':
             self.netG = self.netG_A
-        if self.direction == 'BtoA':
+        else:
             self.netG = self.netG_B
 
     def backward_G(self):
