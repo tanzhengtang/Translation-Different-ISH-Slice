@@ -52,10 +52,3 @@ class DInterface(LightningDataModule):
                 args1[arg] = self.kwargs[arg]
         args1.update(other_args)
         return self.data_module(**args1)
-
-if __name__ == "__main__":
-    dataset = "UnpairedDataset"
-    dataset_fn = "DataSet"
-    importlib.import_module(f".{dataset_fn}", ".data")
-    # getattr(importlib.import_module(f".data", dataset), dataset)
-    getattr(importlib.import_module(f".{dataset_fn}", package = ".data"), dataset)

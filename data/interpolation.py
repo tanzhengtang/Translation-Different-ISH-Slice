@@ -1,8 +1,6 @@
-import numba
 import numpy as np
 import torch
 
-@numba.njit(parallel = True)
 def convolve2d_cpu(image:np.ndarray, kernel:np.ndarray, out:np.ndarray) -> np.ndarray:
     kernel_height, kernel_width = kernel.shape
     out_height, out_width = out.shape
@@ -27,10 +25,10 @@ def image_convolve2d_gpu(image:np.ndarray, kernel:np.ndarray) -> np.ndarray:
     convolved_image = torch.nn.functional.conv2d(image_tensor.unsqueeze(0).unsqueeze(0), kernel_tensor.unsqueeze(0).unsqueeze(0), padding='same')
     return convolved_image.cpu().numpy().squeeze()
 
-def interpolation_2d_kernel_code(image, blank_coords, blank_mask, search_radius, method_index, result_array):
-    x = numba.cuda.grid(1)
-    if x < blank_coords.shape[0]:
-        i, j = blank_coords[x]
+def interpolation_2d_kernel_cpu(image:np.ndarray, blank_coords:np.ndarray, blank_mask:np.ndarray, search_radius:np.uint8, method_index:np.uint8):
+    result_array = image.copy()
+    for blank_coord in blank_coords:
+        i, j = blank_coord
         y_min = max(0, i - search_radius)
         y_max = min(image.shape[0], i + search_radius + 1)
         x_min = max(0, j - search_radius)
@@ -38,6 +36,7 @@ def interpolation_2d_kernel_code(image, blank_coords, blank_mask, search_radius,
         neighborhood = image[y_min:y_max, x_min:x_max]
         neighborhood_val_mask = ~blank_mask[y_min:y_max, x_min:x_max]
         valid_values = neighborhood[neighborhood_val_mask]
+        weights = None
         if method_index == 0:  # mean
             result_array[i, j] = np.mean(valid_values)
         elif method_index == 1:  # median
@@ -65,16 +64,18 @@ def interpolation_2d_kernel_code(image, blank_coords, blank_mask, search_radius,
                 mode_values = valid_values[bin_mask]
                 result_array[i, j] = np.mean(mode_values) if mode_values.size > 0 else np.mean(valid_values)    
         elif method_index == 5:  # gaussian 
-            sigma = 1.0
-            distances = np.sqrt((np.arange(y_min, y_max)[:, None] - i)**2 + (np.arange(x_min, x_max)[None, :] - j)**2)
-            valid_distances = distances[neighborhood_val_mask]
-            weights = np.exp(-valid_distances**2 / (2 * sigma**2))
-            weights = weights / weights.sum()  
+            if weights is None:
+                sigma = 1.0
+                distances = np.sqrt((np.arange(y_min, y_max)[:, None] - i)**2 + (np.arange(x_min, x_max)[None, :] - j)**2)
+                valid_distances = distances[neighborhood_val_mask]
+                weights = np.exp(-valid_distances**2 / (2 * sigma**2))
+                weights = weights / weights.sum()
             result_array[i, j] = np.sum(valid_values * weights)
         else:
-            pass    
+            pass  
+    return result_array
 
-def interpolation_2d_kernel_warpper(image_array:np.ndarray, blank_mask:np.ndarray, search_radius:int = 0, method:int = 0) -> np.ndarray:
+def interpolation_2d_kernel_warpper(image_array:np.ndarray, blank_mask:np.ndarray, search_radius:int = 0, method:int = 5) -> np.ndarray:
     if len(image_array.shape) != 2:
         raise ValueError("must be 2d image for radial interpolation")
     if not search_radius:
@@ -83,7 +84,8 @@ def interpolation_2d_kernel_warpper(image_array:np.ndarray, blank_mask:np.ndarra
         raise ValueError("search_radius is too large for the image size")
     if not np.any(blank_mask) or np.all(blank_mask):
         raise ValueError("the blank_mask is all False or all True")
-    
+    image_array = np.ascontiguousarray(image_array)
+    result_array = np.ascontiguousarray(image_array)
     gpu_mode = torch.cuda.is_available()
     result_array = image_array.copy()
     kernel_size = 2 * search_radius + 1
@@ -94,18 +96,24 @@ def interpolation_2d_kernel_warpper(image_array:np.ndarray, blank_mask:np.ndarra
     densitys = density_map[blank_mask]
     sorted_indices = np.argsort(densitys)[::-1]
     blank_coords = blank_coords[sorted_indices]
-
-    if gpu_mode:
-        threads_per_block = 256
-        blocks_per_grid = (blank_coords.shape[0] + (threads_per_block - 1)) // threads_per_block
-        d_image = numba.cuda.to_device(image_array)
-        d_blank_coords = numba.cuda.to_device(blank_coords)
-        d_blank_mask = numba.cuda.to_device(blank_mask)
-        d_result_array = numba.cuda.to_device(result_array)
-        interpolation_2d_kernel_code = numba.cuda.jit(interpolation_2d_kernel_code)
-        interpolation_2d_kernel_code[blocks_per_grid, threads_per_block](d_image, d_blank_coords, d_blank_mask, search_radius, method, d_result_array)
-        result_array = d_result_array.copy_to_host()
-    else:  
-        interpolation_2d_kernel_code(image_array, blank_coords, blank_mask, search_radius, method, result_array)
-        
+    result_array = interpolation_2d_kernel_cpu(image_array, blank_coords, blank_mask, search_radius, method)
     return result_array
+
+def tensor_gaussian_kernel(kernel_size, sigma = 1.0, channels = 1, device='cuda:0'):
+    ax = torch.arange(-kernel_size // 2 + 1., kernel_size // 2 + 1., device=device)
+    xx, yy = torch.meshgrid(ax, ax, indexing='ij')
+    kernel = torch.exp(-(xx**2 + yy**2) / (2. * sigma**2))
+    kernel = kernel / torch.sum(kernel)
+    kernel = kernel.view(1, 1, kernel_size, kernel_size)
+    kernel = kernel.repeat(channels, 1, 1, 1)
+    return kernel
+
+def interpolation_2d_kernel_gpu_warpper(image_array:np.ndarray, blank_mask:np.ndarray, blank_coords:np.ndarray, search_radius:int = 10, device:str = "cuda:0", gaussian_params:dict = None) -> np.ndarray:
+    image_tensor = torch.from_numpy(image_array.astype(np.float32)).to(device)
+    val_mask_tensor = torch.from_numpy(~blank_mask).to(device)
+    image_tensor = val_mask_tensor * image_tensor
+    image_tensor_pad = torch.nn.functional.pad(image_tensor.unsqueeze(0).unsqueeze(0), (search_radius, search_radius, search_radius, search_radius), mode='constant', value=0).squeeze(0).squeeze(0)
+    kernel_size = 2 * search_radius + 1
+    gaussian_kernel = tensor_gaussian_kernel(kernel_size, **gaussian_params)
+    convolved_image = torch.nn.functional.conv2d(image_tensor_pad.unsqueeze(0).unsqueeze(0), gaussian_kernel, padding='valid').squeeze(0).squeeze(0)
+    return convolved_image

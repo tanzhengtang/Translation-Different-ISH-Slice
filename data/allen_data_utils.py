@@ -1,7 +1,6 @@
 import numpy as np
 import SimpleITK as sitk
 import data_utils
-import scipy
 
 '''
     only for 2D-ISH image of allen data processing
@@ -38,14 +37,3 @@ def synthesis_remove_expr_UVstyle_images(raw_image:sitk.Image, expr_image:sitk.I
         UVs_image_np_cl[expr_image_cl > 0] = sitk_compute_otsu_threshold(sitk.VectorIndexSelectionCast(raw_image, cl), is_mid = otsu_is_mid)
     UVs_image = sitk_rgb_to_3channel_gray(sitk.GetImageFromArray(UVs_image_np.copy(), isVector = True))
     return UVs_image
-
-
-
-if __name__ == "__main__":
-    raw_img = sitk.ReadImage("/home/t207/Translation-Different-ISH-Slice/dataset/demo/71112015_raw.jpg")
-    expr_img = sitk.ReadImage("/home/t207/Translation-Different-ISH-Slice/dataset/demo/71112015_expr.jpg")
-    traw_np = data_utils.sitk_to_numpy(raw_img)[:,:,0]
-    texpr_np = data_utils.sitk_to_numpy(expr_img)[:,:,0]
-    blank_mask = texpr_np > 0
-    # result = radial_interpolation_2d_mask_pixel(traw_np, blank_mask, search_radius = 50, method = 'nearest')
-    sitk.WriteImage(sitk.GetImageFromArray(result), "/home/t207/Translation-Different-ISH-Slice/dataset/demo/71112015_raw_interpolated.png")

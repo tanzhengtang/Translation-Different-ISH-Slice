@@ -134,10 +134,3 @@ def combine_2d_image_from_list(crops:list[list[np.ndarray]]) -> np.ndarray:
         rows.append(row_img)
     full_img_np = np.concatenate(rows, axis = 0)
     return full_img_np
-
-if __name__ == "__main__":
-    img = sitk.ReadImage("/home/t207/Translation-Different-ISH-Slice/dataset/demo/71112015_expr.jpg")
-    img_np = sitk_to_numpy(img)
-    crops = crop_2d_image_to_list(img_np, window_size = 512, pad_val_func = 'max', crop_way = "delete")
-    re_img = combine_2d_image_from_list(crops)
-    sitk.WriteImage(sitk.GetImageFromArray(re_img, isVector = True), "/home/t207/Translation-Different-ISH-Slice/dataset/demo/71112015_expr_reconstructed.png")
