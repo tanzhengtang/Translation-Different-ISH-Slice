@@ -277,11 +277,11 @@ METRICS_CLASS_DICT = dict(MSE = torchmetrics.functional.mean_squared_error,
                           MS_SSIM = torchmetrics.functional.multiscale_structural_similarity_index_measure)
 
 class GanCommonModel(LightningModule):
-    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, val_metric_names:list, netG_ckpt_path:str, netD_ckpt_path:str):
+    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, 
+                #  val_metric_names:list, netG_ckpt_path:str, netD_ckpt_path:str
+                ):
         super().__init__()
         self.automatic_optimization = False
-        # self.netG = torch.nn.LazyBatchNorm1d()
-        # self.netD = torch.nn.LazyBatchNorm1d()
         self.save_hyperparameters()
         self.load_networks()
         self.configure_loss()

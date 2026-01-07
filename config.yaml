@@ -108,15 +108,15 @@ model:
       norm_layer: instance
 
 data:
-  class_path: .data.data_interface.DInterface
+  class_path: data.data_interface.DataInterface
   init_args:
-    dataset: UnpairedDataset
+    dataset: AlignedDataSet
     dataset_params:
       # dataset_path: /home/t207/Lab_Data_preproc2/allen_data/code/deep-learning-package/tcgan/dataset/template_convert2
       # dataset_path: /home/t207/Lab_Data_preproc2/allen_data/code/deep-learning-package/tcgan/dataset/nistpt_template
       # mA_name: nissl
       # mB_name: stpt
-      dataset_path: /home/t207/Lab_Data_preproc2/allen_data/code/deep-learning-package/cgan/datasets/ish/ss_101_nissl_denoise
+      dataset_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/demo
       mA_name: trainA
       mB_name: trainB
       downsample_factor: 1

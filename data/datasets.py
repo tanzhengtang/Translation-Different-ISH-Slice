@@ -29,20 +29,20 @@ class CommonDataSet(torch.utils.data.Dataset):
         return np.max([len(self.mA_list), len(self.mB_list)])
 
 class UnalignedDataSet(CommonDataSet):
-    def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
     
-    def _get_image_index(self,index):
+    def _get_image_index(self, index):
         return index, np.random.randint(0, index)
 
 class AlignedDataSet(CommonDataSet):
-    def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 # TODO. to inplement the code of patch dataset.
 class PatchDataset(CommonDataSet):
-    def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 DATASETS_CLASS_DICT = dict(AlignedDataSet = AlignedDataSet,
                 UnalignedDataSet = UnalignedDataSet)

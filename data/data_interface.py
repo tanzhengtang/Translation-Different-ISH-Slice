@@ -6,8 +6,17 @@ from data import datasets
 class DataInterface(LightningDataModule):
     def __init__(self, dataset:str, dataset_params:dict, num_workers:int = 8, batch_size:int = 3):
         super().__init__()
+        self.dataset = dataset
+        self.dataset_params = dataset_params
+        self.num_workers = num_workers
+        self.batch_size = batch_size
         self.save_hyperparameters()
         self.load_data_module()
+        
+    def load_data_module(self):
+        if self.dataset not in datasets.DATASETS_CLASS_DICT.keys():
+            raise ValueError(f"No such {self.dataset} is implemented")
+        self._dataset = datasets.DATASETS_CLASS_DICT[self.dataset](**self.dataset_params)
 
     def setup(self, stage:typing.Literal["fit", "validate", "test"] = "fit", auto_split_dataset:bool = True):
         if stage == "fit":
@@ -28,9 +37,3 @@ class DataInterface(LightningDataModule):
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(self.testset, batch_size = self.batch_size, num_workers = self.num_workers, shuffle = False)
-
-    def load_data_module(self):
-        if self.dataset not in datasets.DATASETS_CLASS_DICT.keys():
-            raise ValueError(f"No such {self.dataset} is implemented")
-        self._dataset = datasets.DATASETS_CLASS_DICT[self.dataset](**self.dataset_params)
-        

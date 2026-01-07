@@ -1,11 +1,10 @@
 import torch
 import itertools
 from model import networks
-import lightning
 
 class CycleGanInterface(networks.GanCommonModel):
-    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, val_metric_names:list, netG_ckpt_path:str, netD_ckpt_path:str):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.automatic_optimization = False
         self.save_hyperparameters()
         self.load_networks()
@@ -27,7 +26,7 @@ class CycleGanInterface(networks.GanCommonModel):
         pool_image_size = self.hparams.get('pool_image_size', 50)
         self.fake_A_pool = networks.ImagePool(pool_image_size)
         self.fake_B_pool = networks.ImagePool(pool_image_size)
-        self.direction = self.hyparams.get('direction', 'AtoB')
+        self.direction = self.hparams.get('direction', 'AtoB')
         if self.direction == 'AtoB':
             self.netG = self.netG_A
         else:
