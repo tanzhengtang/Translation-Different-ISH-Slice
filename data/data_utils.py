@@ -20,6 +20,9 @@ def torch_tensor_to_sitk(img:torch.Tensor, spacing:int = 1) -> sitk.Image:
     res.SetSpacing((spacing,spacing,spacing))
     return res
 
+def numpy_to_save_img(img_np:np.ndarray, img_path:str, **args) -> bool:
+    return sitk.WriteImage(sitk.GetImageFromArray(np.ascontiguousarray(img_np), **args), img_path)
+
 def sitk_to_numpy(img:sitk.Image) -> np.ndarray:
     if len(img.GetSize()) == 2:
         pass

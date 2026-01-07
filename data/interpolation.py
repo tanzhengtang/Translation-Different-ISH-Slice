@@ -75,9 +75,7 @@ def interpolation_2d_kernel_cpu(image:np.ndarray, blank_coords:np.ndarray, blank
             pass  
     return result_array
 
-def interpolation_2d_kernel_warpper(image_array:np.ndarray, blank_mask:np.ndarray, search_radius:int = 0, method:int = 5) -> np.ndarray:
-    if len(image_array.shape) != 2:
-        raise ValueError("must be 2d image for radial interpolation")
+def interpolation_2d_kernel_cpu_warpper(image_array:np.ndarray, blank_mask:np.ndarray, search_radius:int = 10, method:int = 5) -> np.ndarray:
     if not search_radius:
         raise("search_radius must be larger than 0")
     if search_radius > min(image_array.shape[0], image_array.shape[1]) // 2:
@@ -85,9 +83,7 @@ def interpolation_2d_kernel_warpper(image_array:np.ndarray, blank_mask:np.ndarra
     if not np.any(blank_mask) or np.all(blank_mask):
         raise ValueError("the blank_mask is all False or all True")
     image_array = np.ascontiguousarray(image_array)
-    result_array = np.ascontiguousarray(image_array)
     gpu_mode = torch.cuda.is_available()
-    result_array = image_array.copy()
     kernel_size = 2 * search_radius + 1
     kernel = np.ones((kernel_size, kernel_size), dtype = np.uint8)
     convolve2d_func = image_convolve2d_gpu if gpu_mode else image_convolve2d_cpu
@@ -117,3 +113,16 @@ def interpolation_2d_kernel_gpu_warpper(image_array:np.ndarray, blank_mask:np.nd
     gaussian_kernel = tensor_gaussian_kernel(kernel_size, **gaussian_params)
     convolved_image = torch.nn.functional.conv2d(image_tensor_pad.unsqueeze(0).unsqueeze(0), gaussian_kernel, padding='valid').squeeze(0).squeeze(0)
     return convolved_image
+
+if __name__ == "__main__":
+    import data_utils
+    import SimpleITK as sitk
+
+    raw_img = sitk.ReadImage("/home/t207/Lab_Data_preproc2/allen_data/code/Translation-Different-ISH-Slice/dataset/demo/71112015_raw.jpg")
+    expr_img = sitk.ReadImage("/home/t207/Lab_Data_preproc2/allen_data/code/Translation-Different-ISH-Slice/dataset/demo/71112015_expr.jpg")
+    traw_np = data_utils.sitk_to_numpy(raw_img)
+    texpr_np = data_utils.sitk_to_numpy(expr_img)
+    pl_img = traw_np.copy()
+    for cl in range(3):
+        pl_img[:,:,cl] = interpolation_2d_kernel_cpu_warpper(traw_np[:,:,cl], texpr_np[:,:,cl] > 0, 20, 5) 
+    sitk.WriteImage(sitk.GetImageFromArray(pl_img.astype(np.uint8), isVector=True), f"./71112015_raw_interpolated_cpu_{20}.png")

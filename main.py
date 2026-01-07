@@ -10,9 +10,8 @@ from argparse import ArgumentParser
 from pytorch_lightning import Trainer
 import pytorch_lightning.callbacks as plc
 
-from model import MInterface
-from data import DInterface
-from utils import load_model_path_by_args
+from model import cgan_interface
+from data import data_interface
 
 def load_callbacks():
     callbacks = []
