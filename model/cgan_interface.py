@@ -82,13 +82,11 @@ class CycleGanInterface(networks.GanCommonModel):
         self.rec_A = self.netG_B(self.fake_B)
         self.fake_A = self.netG_B(self.real_B)
         self.rec_B = self.netG_A(self.fake_A)
-
         self.netD_A.requires_grad_(False)
         self.netD_B.requires_grad_(False)        
         g_opt.zero_grad()
         loss_G_A, loss_G_B, loss_G = self.backward_G()
         g_opt.step()
-
         self.netD_A.requires_grad_(True)
         self.netD_B.requires_grad_(True)
         d_opt.zero_grad()  

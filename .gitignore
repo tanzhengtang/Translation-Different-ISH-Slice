@@ -20,3 +20,4 @@ nt_stpt/
 test_crop/
 *.pth
 *.nii.gz
+wandb/

@@ -34,7 +34,9 @@ def sitk_to_numpy(img:sitk.Image) -> np.ndarray:
 
 def sitk_to_torch_tensor(img:sitk.Image) -> torch.Tensor:
     img = sitk.RescaleIntensity(img, 0, 1)
-    img_t = torch.from_numpy(sitk_to_numpy(img)).contiguous()
+    img_array = sitk_to_numpy(img)
+    img_array = np.moveaxis(img_array, -1, 0) if img.GetNumberOfComponentsPerPixel() == 3 else np.expand_dims(img_array, axis = 0)
+    img_t = torch.from_numpy(img_array).contiguous()
     default_float_dtype = torch.get_default_dtype()
     return img_t.to(default_float_dtype)
 
