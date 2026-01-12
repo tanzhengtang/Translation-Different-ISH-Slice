@@ -21,7 +21,7 @@ class DataInterface(LightningDataModule):
     def setup(self, stage:typing.Literal["fit", "validate", "test"] = "fit", auto_split_dataset:bool = True):
         if stage == "fit":
             if auto_split_dataset:
-                self.trainset, self.valset, self.testset = torch.utils.data.random_split(self._dataset, [0.8, 0.1, 0.1], torch.Generator().manual_seed(0))
+                self.trainset, self.valset, self.testset = torch.utils.data.random_split(self._dataset, [0.7, 0.2, 0.1], torch.Generator().manual_seed(0))
             else:
                 self.trainset = self._dataset
         if stage == "validate":

@@ -277,9 +277,7 @@ METRICS_CLASS_DICT = dict(MSE = torchmetrics.functional.mean_squared_error,
                           MS_SSIM = torchmetrics.functional.multiscale_structural_similarity_index_measure)
 
 class GanCommonModel(LightningModule):
-    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, 
-                #  val_metric_names:list, netG_ckpt_path:str, netD_ckpt_path:str
-                 ):
+    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, val_metric_names:list = []):
         super().__init__()
         self.automatic_optimization = False
         self.save_hyperparameters()
@@ -309,10 +307,9 @@ class GanCommonModel(LightningModule):
     def configure_optimizers(self):
         weight_decay = self.hparams.get('weight_decay', 0)
         g_opt = torch.optim.Adam(self.netG.parameters(), lr = self.hparams.lr, weight_decay = weight_decay)
-        d_opt = torch.optim.Adam(self.netD.parameters(), lr = self.hparams.lr, weight_decay = weight_decay)
+        d_opt = torch.optim.Adam(self.netD.parameters(), lr = self.hparams.lr * 0.2, weight_decay = weight_decay)
         if self.hparams.lr_scheduler is not None:
             if self.hparams.lr_scheduler == 'step':
-                print(1)
                 scheduler_g = torch.optim.lr_scheduler.StepLR(g_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
                 scheduler_d = torch.optim.lr_scheduler.StepLR(d_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
             elif self.hparams.lr_scheduler == 'cosine':
@@ -325,10 +322,10 @@ class GanCommonModel(LightningModule):
     def load_networks(self):
         self.netG = NETWORKS_CLASS_DICT[self.hparams.netG_name](**self.hparams.netG_params)
         self.netD = NETWORKS_CLASS_DICT[self.hparams.netD_name](**self.hparams.netD_params)
-        if hasattr(self.hparams, 'netG_ckpt_path'):
-            self.netG.load_from_ckpt(self.hparams.netG_ckpt_path)
-        if hasattr(self.hparams, 'netD_ckpt_path'):
-            self.netD.load_from_ckpt(self.hparams.netD_ckpt_path)
+        if hasattr(self.hparams.netG_params, 'netG_ckpt_path'):
+            self.netG.load_from_ckpt(self.hparams.netG_params['netG_ckpt_path'])
+        if hasattr(self.hparams.netD_params, 'netD_ckpt_path'):
+            self.netD.load_from_ckpt(self.hparams.netD_params['netD_ckpt_path'])
     
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -359,8 +356,8 @@ class GanCommonModel(LightningModule):
             for metric_name in self.hparams.val_metric_names:
                 val_loss_dict[metric_name] = METRICS_CLASS_DICT[metric_name](val_g_y.detach(), y)
         if val_loss_dict:
-            self.log_dict(val_loss_dict, prog_bar = True, on_step = True, logger = True)
-        return val_loss_dict
+            self.log_dict(val_loss_dict, prog_bar = True, on_step = True, logger = True, sync_dist = True)
+        return val_g_y.detach()
     
     def test_step(self, batch, batch_idx):
         return

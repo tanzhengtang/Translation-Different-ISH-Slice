@@ -21,3 +21,6 @@ test_crop/
 *.pth
 *.nii.gz
 wandb/
+.vscode/
+中文说明.md
+test_pro.py

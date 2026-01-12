@@ -7,28 +7,29 @@ trainer:
   precision: bf16-mixed
 
   callbacks:
-    class_path: lightning.pytorch.callbacks.LearningRateMonitor
-    init_args:
-      logging_interval: step
-    class_path: lightning.pytorch.callbacks.ModelCheckpoint
-    init_args:
+    - class_path: model.callback.SaveMiddleCallback
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
         # monitor: g_loss
-        monitor: loss_G
-        mode: min
-        save_top_k: 2
+          monitor: loss_G
+          mode: min
+          save_top_k: 2
         # filename: 'min-{epoch}-{g_loss:.4f}'
-        filename: 'min-{epoch}-{loss_G:.4f}'
-        save_weights_only: True
-    class_path: lightning.pytorch.callbacks.ModelCheckpoint
-    init_args:
+          filename: 'min-{epoch}-{loss_G:.4f}'
+          save_weights_only: True
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
         # monitor: g_loss
-        monitor: loss_G
-        mode: min
-        save_top_k: -1
-        every_n_epochs: 10
-        save_weights_only: True
+          monitor: loss_G
+          mode: min
+          save_top_k: -1
+          every_n_epochs: 10
+          save_weights_only: True
         # filename: '{epoch}-{g_loss:.4f}'
-        filename: 'min-{epoch}-{loss_G:.4f}'
+          filename: 'min-{epoch}-{loss_G:.4f}'
 
   # logger: True
   logger:
@@ -39,11 +40,12 @@ trainer:
       save_dir: ./lightning_logs
       log_model: false
 
-  check_val_every_n_epoch: 1
-  log_every_n_steps: 1
-  inference_mode: true
+  fast_dev_run: false
+  check_val_every_n_epoch: 5
+  log_every_n_steps: 10
+  # inference_mode: true
   # fast_dev_run: false
-  max_epochs: 100
+  max_epochs: 50
   min_epochs: null
   # max_steps: -1
   # min_steps: null
@@ -53,7 +55,7 @@ trainer:
   # limit_test_batches: null
   # limit_predict_batches: null
   # overfit_batches: 0.0
-  # val_check_interval: null
+  # val_check_interval: 2
   # num_sanity_val_steps: null
   # enable_checkpointing: null
   # enable_progress_bar: null
@@ -89,6 +91,7 @@ model:
     lr_decay_min_lr: 1e-6
     lr_decay_rate: 0.01
     weight_decay: 0.001
+    val_metric_names: [MSE, MS_SSIM, SSIM]
 
     # netG_name: ResnetGenerator3D
     # netG_name: DesnetGenerator3D
@@ -98,7 +101,7 @@ model:
       output_nc: 3
       ngf: 128
       drop_rate: 0.1
-      n_blocks: 6
+      n_blocks: 9
       norm_layer: instance
 
     netD_name: NLayerDiscriminator2D
@@ -108,7 +111,7 @@ model:
       ndf: 8
       n_layers: 3
       norm_layer: instance
-  # val_metric_names: []
+  
   # netG_ckpt_path: ""
   # netD_ckpt_path: ""
 

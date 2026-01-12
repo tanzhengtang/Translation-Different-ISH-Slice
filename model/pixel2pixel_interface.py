@@ -6,17 +6,9 @@ class Pixel2PixelInterface(networks.GanCommonModel):
         super().__init__( **kwargs)
         self.automatic_optimization = False
         self.save_hyperparameters()
+        self.hparams.netD_params['input_nc'] = self.hparams.netG_params['input_nc'] + self.hparams.netG_params['output_nc']
         self.load_networks()
         self.configure_loss()
-
-    def load_networks(self):
-        self.netG = networks.NETWORKS_CLASS_DICT[self.hparams.netG_name](**self.hparams.netG_params)
-        self.hparams.netD_params['input_nc'] = self.hparams.netG_params['input_nc'] + self.hparams.netG_params['output_nc']
-        self.netD = networks.NETWORKS_CLASS_DICT[self.hparams.netD_name](**self.hparams.netD_params)
-        if hasattr(self.hparams, 'netG_ckpt_path'):
-            self.netG.load_from_ckpt(self.hparams.netG_ckpt_path)
-        if hasattr(self.hparams, 'netD_ckpt_path'):
-            self.netD.load_from_ckpt(self.hparams.netD_ckpt_path)
 
     def backward_G(self):
         fake_XY = torch.cat((self.real_X, self.fake_Y), 1)
@@ -53,5 +45,5 @@ class Pixel2PixelInterface(networks.GanCommonModel):
         loss_G = self.backward_G()
         g_opt.step()
         sch_g.step() 
-        self.log_dict({"loss_G": loss_G, "loss_D": loss_D, 'lr_g': g_opt.param_groups[0]['lr'], 'lr_d':d_opt.param_groups[0]['lr']}, on_epoch = False, prog_bar = True, on_step = True, logger = True, sync_dist = True)
+        self.log_dict({"loss_G": loss_G, "loss_D": loss_D}, on_epoch = False, prog_bar = True, on_step = True, logger = True, sync_dist = True)
         return loss_G

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import SimpleITK as sitk
 import torch
+import torchvision
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -32,13 +33,37 @@ def sitk_to_numpy(img:sitk.Image) -> np.ndarray:
         raise("error image is 1d image or higher than 3d image")
     return sitk.GetArrayFromImage(img)
 
+def numpy_normalize_rgb(img:np.ndarray) -> np.ndarray:
+    img_float = img.astype(np.float32)
+    return (img_float - 127.5) / 127.5
+
+def numpy_denormalize_rgb(img_norm:np.ndarray):
+    if img_norm.max() > 1 or img_norm.min() < -1:
+        raise ValueError('It seems that the img is not normalized since its max value > 1 or min value < -1!')
+    img_denorm = img_norm * 127.5 + 127.5
+    img_denorm = np.clip(img_denorm, 0, 255)
+    img_uint8 = img_denorm.astype(np.uint8)
+    return img_uint8
+
 def sitk_to_torch_tensor(img:sitk.Image) -> torch.Tensor:
-    img = sitk.RescaleIntensity(img, 0, 1)
     img_array = sitk_to_numpy(img)
     img_array = np.moveaxis(img_array, -1, 0) if img.GetNumberOfComponentsPerPixel() == 3 else np.expand_dims(img_array, axis = 0)
-    img_t = torch.from_numpy(img_array).contiguous()
-    default_float_dtype = torch.get_default_dtype()
-    return img_t.to(default_float_dtype)
+    if img_array.shape[0] == 3:
+        img_array = numpy_normalize_rgb(img_array)
+    img_tensor = torch.from_numpy(img_array).contiguous()
+    img_tensor = img_tensor.to(torch.get_default_dtype())
+    # print(img_t.min(), img_t.max()) 
+    # std_mean = (0.5,) if img.GetNumberOfComponentsPerPixel() == 1 else (0.5, 0.5, 0.5)
+    # img_t = torchvision.transforms.Normalize(std_mean, std_mean)(img_t) if is_normalize else img_t
+    # print(img_t.min(), img_t.max()) 
+    return img_tensor
+
+def torch_tensor_to_numpy(input_image:torch.Tensor):
+    image_numpy = input_image.squeeze(0).cpu().float().numpy()  # convert it into a numpy array
+    image_numpy = np.moveaxis(image_numpy, 0, -1)
+    if image_numpy.shape[-1] == 3:
+        image_numpy = numpy_denormalize_rgb(image_numpy)
+    return image_numpy
 
 def resample_image_specific_spacing(image:sitk.Image, new_spacing:list) -> sitk.Image:
     original_size = image.GetSize()

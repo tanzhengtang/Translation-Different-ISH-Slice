@@ -2,8 +2,8 @@ import torch
 import numpy as np
 import SimpleITK as sitk
 from data import data_utils
-# TODO. add the data augmentation func
 
+# TODO. add the data augmentation func
 class CommonDataSet(torch.utils.data.Dataset):
     def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
         super().__init__()
@@ -23,8 +23,7 @@ class CommonDataSet(torch.utils.data.Dataset):
         if self.downsample_factor >= 2:
             A_img = data_utils.sitk_downsample(A_img, self.downsample_factor)
             B_img = data_utils.sitk_downsample(B_img, self.downsample_factor)
-        # print(data_utils.sitk_to_torch_tensor(A_img).shape)
-        return [data_utils.sitk_to_torch_tensor(A_img), data_utils.sitk_to_torch_tensor(B_img)]
+        return data_utils.sitk_to_torch_tensor(A_img), data_utils.sitk_to_torch_tensor(B_img)
     
     def __len__(self):
         return np.max([len(self.mA_list), len(self.mB_list)])
