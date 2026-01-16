@@ -3,14 +3,17 @@ import SimpleITK as sitk
 import data_utils
 import interpolation
 import os
-
 '''
     only for 2D-ISH image of allen data processing
 '''
 
 DEMO_SECID = 71249739
 IMG_BASIC_DIR = "/home/t207/lab_data_preproc4/allen_data/img_data"
-DEMO_DATA_DIR = "./dataset/demo"
+DEMO_DATA_DIR = f"./dataset/{DEMO_SECID}"
+DEMO_SECIDS = []
+DEMO_DONOR_DICT = {
+    "6219" : {'Ism1': 71249741, 'Krt222': 71249742, 'Brinp2': 71249743, 'Mical2': 71249740, 'Rassf8': 71249739, 'Ppp4r4': 71249744}
+}
 
 def sitk_rgb_to_3channel_gray(image: str | sitk.Image | np.ndarray, weights=(0.299, 0.587, 0.114)) -> np.ndarray:
     if isinstance(image, str):
@@ -63,9 +66,10 @@ def make_demo_dataset(win_size:int = 1024, search_radius:int = 20, method:int = 
     os.makedirs(f"{DEMO_DATA_DIR}/xl_img", exist_ok = True)
     expr_img_list= data_utils.make_dataset(f"{IMG_BASIC_DIR}/{DEMO_SECID}/expression")
     raw_img_list= data_utils.make_dataset(f"{IMG_BASIC_DIR}/{DEMO_SECID}/raw")
+    print(len(raw_img_list))
     for ix in range(len(raw_img_list)):
         img_name= os.path.split(raw_img_list[ix])[1].split(".")[0]
-        print(img_name)
+        print(f"{ix}th: {img_name}")
         img_numpy_crops_list = data_utils.crop_2d_image_to_list(data_utils.sitk_to_numpy(sitk.ReadImage(raw_img_list[ix])), win_size) 
         expr_numpy_crops_list = data_utils.crop_2d_image_to_list(data_utils.sitk_to_numpy(sitk.ReadImage(expr_img_list[ix])), win_size, 'min')
         fake_numpy_crops_list = []
@@ -90,7 +94,7 @@ def make_demo_dataset(win_size:int = 1024, search_radius:int = 20, method:int = 
                 data_utils.numpy_to_save_img(pl_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainD/{w}_{h}_{img_name}.png", isVector = True)
                 data_utils.numpy_to_save_img(sitk_rgb_to_3channel_gray(real_img).astype(np.uint8), f"{DEMO_DATA_DIR}/trainE/{w}_{h}_{img_name}.png", isVector = True)
         data_utils.numpy_to_save_img(data_utils.combine_2d_image_from_list(fake_numpy_crops_list), f"{DEMO_DATA_DIR}/{img_name}_crop_fake.png", isVector = True)
-        break
+        # break
 if __name__ == "__main__":
     # print(data_utils.make_dataset(f"{IMG_BASIC_DIR}/{DEMO_SECID}/expression"))
     make_demo_dataset()

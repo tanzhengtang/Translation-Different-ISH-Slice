@@ -40,7 +40,7 @@ class SaveMiddleCallback(Callback):
         # gs_slice = np.moveaxis(input_y.squeeze(0).detach().to(torch.float).cpu().numpy(), 0, -1)
         # gt_slice = np.moveaxis(input_x.squeeze(0).detach().to(torch.float).cpu().numpy(), 0, -1)
         # pd_slice = np.moveaxis(preds.squeeze(0).detach().to(torch.float).cpu().numpy(), 0, -1)
-        gs_slice, gt_slice, pd_slice = data_utils.torch_tensor_to_numpy(input_x), data_utils.torch_tensor_to_numpy(input_y), data_utils.torch_tensor_to_numpy(preds)
+        gs_slice, gt_slice, pd_slice = data_utils.torch_tensor_to_numpy(input_x[0,::,]), data_utils.torch_tensor_to_numpy(input_y[0,::,]), data_utils.torch_tensor_to_numpy(preds[0,::,])
         pair = np.concat([pd_slice, gt_slice, gs_slice], axis = 1)
         wb.experiment.log({"val_pair": wandb.Image(pair.astype(np.uint8), caption="prediction---------ground_truth")})
 

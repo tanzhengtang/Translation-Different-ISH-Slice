@@ -23,4 +23,4 @@ test_crop/
 wandb/
 .vscode/
 中文说明.md
-test_pro.py
+test_pro*.py

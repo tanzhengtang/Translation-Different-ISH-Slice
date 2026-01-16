@@ -59,7 +59,8 @@ def sitk_to_torch_tensor(img:sitk.Image) -> torch.Tensor:
     return img_tensor
 
 def torch_tensor_to_numpy(input_image:torch.Tensor):
-    image_numpy = input_image.squeeze(0).cpu().float().numpy()  # convert it into a numpy array
+    # input_image just (c,h,w,d) shape
+    image_numpy = input_image.cpu().float().numpy()  # convert it into a numpy array
     image_numpy = np.moveaxis(image_numpy, 0, -1)
     if image_numpy.shape[-1] == 3:
         image_numpy = numpy_denormalize_rgb(image_numpy)

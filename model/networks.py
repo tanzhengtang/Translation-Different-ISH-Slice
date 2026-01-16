@@ -90,7 +90,6 @@ class NLayerDiscriminator2D(torch.nn.Module):
             nf_mult_prev = nf_mult
             nf_mult = min(2**n, 8)
             sequence += [torch.nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size = kernel_size, stride = stride, padding = padding, bias = use_bias), get_2Dnorm_layer(norm_layer, ndf * nf_mult), torch.nn.LeakyReLU(True)]
-
         nf_mult_prev = nf_mult
         nf_mult = min(2**n_layers, 8)
         sequence += [torch.nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size = kernel_size, stride = 1, padding = padding, bias = use_bias), get_2Dnorm_layer(norm_layer, ndf * nf_mult), torch.nn.LeakyReLU(True)]
@@ -99,6 +98,27 @@ class NLayerDiscriminator2D(torch.nn.Module):
             sequence.append(torch.nn.Sigmoid())
         self.model = torch.nn.Sequential(*sequence)
 
+    def forward(self, input):
+        return self.model(input)
+
+class SpectralNormalizationDiscriminator2D(torch.nn.Module):
+    def __init__(self, input_nc:int, ndf:int = 64, n_layers:int = 3, kernel_size:int = 4, use_sigmoid:bool = False, use_bias:bool = False, padding:int = 1, stride:int = 2):
+        super(SpectralNormalizationDiscriminator2D, self).__init__()
+        sequence = [torch.nn.utils.spectral_norm(torch.nn.Conv2d(input_nc, ndf, kernel_size = kernel_size, stride = stride, padding = padding)), torch.nn.LeakyReLU(0.2, True)]
+        nf_mult = 1
+        nf_mult_prev = 1
+        for n in range(1, n_layers):
+            nf_mult_prev = nf_mult
+            nf_mult = min(2**n, 8)
+            sequence += [torch.nn.utils.spectral_norm(torch.nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size = kernel_size, stride=stride, padding = padding, bias = use_bias)), torch.nn.LeakyReLU(True)]
+        nf_mult_prev = nf_mult
+        nf_mult = min(2**n_layers, 8)
+        sequence += [torch.nn.utils.spectral_norm(torch.nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size = kernel_size, stride = 1, padding = padding, bias = use_bias)), torch.nn.LeakyReLU(True)]
+        sequence += [torch.nn.utils.spectral_norm(torch.nn.Conv2d(ndf * nf_mult, 1, kernel_size = kernel_size, stride = 1, padding = padding))]
+        if use_sigmoid:
+            sequence.append(torch.nn.Sigmoid())
+        self.model = torch.nn.Sequential(*sequence)
+            
     def forward(self, input):
         return self.model(input)
 
@@ -265,7 +285,8 @@ NETWORKS_CLASS_DICT = dict(ResnetGenerator2D = ResnetGenerator2D,
                 ResnetGenerator3D = ResnetGenerator3D,
                 NLayerDiscriminator2D = NLayerDiscriminator2D,
                 NLayerDiscriminator3D = NLayerDiscriminator3D,
-                DesnetGenerator3D = DesnetGenerator3D)
+                DesnetGenerator3D = DesnetGenerator3D,
+                SpectralNormalizationDiscriminator2D = SpectralNormalizationDiscriminator2D)
 
 from lightning.pytorch import LightningModule
 import torchmetrics
@@ -287,8 +308,17 @@ class GanCommonModel(LightningModule):
     def forward(self, x):
         return self.netG(x)
     
-    def criterionGAN(self, input_tensor, is_real = True):
-        target_tensor = torch.zeros_like(input_tensor, device = self.device) if not is_real else torch.ones_like(input_tensor, device = self.device)
+    def criterionGAN(self, input_tensor:torch.Tensor, target_is_real:bool, use_smoothing:bool = False):
+        if use_smoothing:
+            if target_is_real:
+                target_tensor = 0.7 + 0.5 * torch.rand_like(input_tensor, device=self.device)
+            else:
+                target_tensor = 0.1 * torch.rand_like(input_tensor, device=self.device)
+        else:
+            if target_is_real:
+                target_tensor = torch.ones_like(input_tensor, device=self.device)
+            else:
+                target_tensor = torch.zeros_like(input_tensor, device=self.device)
         return self.loss_function(input_tensor, target_tensor)
     
     def configure_loss(self):
@@ -307,7 +337,7 @@ class GanCommonModel(LightningModule):
     def configure_optimizers(self):
         weight_decay = self.hparams.get('weight_decay', 0)
         g_opt = torch.optim.Adam(self.netG.parameters(), lr = self.hparams.lr, weight_decay = weight_decay)
-        d_opt = torch.optim.Adam(self.netD.parameters(), lr = self.hparams.lr * 0.2, weight_decay = weight_decay)
+        d_opt = torch.optim.Adam(self.netD.parameters(), lr = self.hparams.lr * 0.5, weight_decay = weight_decay)
         if self.hparams.lr_scheduler is not None:
             if self.hparams.lr_scheduler == 'step':
                 scheduler_g = torch.optim.lr_scheduler.StepLR(g_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
