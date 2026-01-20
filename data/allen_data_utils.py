@@ -3,17 +3,19 @@ import SimpleITK as sitk
 import data_utils
 import interpolation
 import os
+
 '''
     only for 2D-ISH image of allen data processing
 '''
 
-DEMO_SECID = 71249739
-IMG_BASIC_DIR = "/home/t207/lab_data_preproc4/allen_data/img_data"
-DEMO_DATA_DIR = f"./dataset/{DEMO_SECID}"
-DEMO_SECIDS = []
 DEMO_DONOR_DICT = {
     "6219" : {'Ism1': 71249741, 'Krt222': 71249742, 'Brinp2': 71249743, 'Mical2': 71249740, 'Rassf8': 71249739, 'Ppp4r4': 71249744}
 }
+DEMO_SECID = DEMO_DONOR_DICT["6219"]["Mical2"]
+#EMO_SECID = DEMO_DONOR_DICT["6219"]["Rassf8"]
+IMG_BASIC_DIR = "/home/t207/lab_data_preproc4/allen_data/img_data"
+DEMO_DATA_DIR = f"./dataset/{DEMO_SECID}"
+ALTAS_IMG_DIR = "/home/t207/lab_data_preproc4/allen_data/altas_img/1"
 
 def sitk_rgb_to_3channel_gray(image: str | sitk.Image | np.ndarray, weights=(0.299, 0.587, 0.114)) -> np.ndarray:
     if isinstance(image, str):
@@ -85,19 +87,59 @@ def make_demo_dataset(win_size:int = 1024, search_radius:int = 20, method:int = 
                 expr_img = expr_numpy_crops_list[w][h]
                 fake_numpy_crops_list[w].append(fake_img)
                 if np.max(expr_numpy_crops_list[w][h]) > 0:
-                    data_utils.numpy_to_save_img(pl_img.astype(np.uint8), f"{DEMO_DATA_DIR}/pl_img/{w}_{h}_{img_name}.png", isVector = True)
-                    data_utils.numpy_to_save_img(real_img.astype(np.uint8), f"{DEMO_DATA_DIR}/rl_img/{w}_{h}_{img_name}.png", isVector = True)
-                    data_utils.numpy_to_save_img(sitk_rgb_to_3channel_gray(real_img).astype(np.uint8), f"{DEMO_DATA_DIR}/xl_img/{w}_{h}_{img_name}.png", isVector = True)
-                data_utils.numpy_to_save_img(fake_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainA/{w}_{h}_{img_name}.png", isVector = True)
-                data_utils.numpy_to_save_img(real_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainB/{w}_{h}_{img_name}.png", isVector = True)
-                data_utils.numpy_to_save_img(expr_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainC/{w}_{h}_{img_name}.png", isVector = True)
-                data_utils.numpy_to_save_img(pl_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainD/{w}_{h}_{img_name}.png", isVector = True)
-                data_utils.numpy_to_save_img(sitk_rgb_to_3channel_gray(real_img).astype(np.uint8), f"{DEMO_DATA_DIR}/trainE/{w}_{h}_{img_name}.png", isVector = True)
-        data_utils.numpy_to_save_img(data_utils.combine_2d_image_from_list(fake_numpy_crops_list), f"{DEMO_DATA_DIR}/{img_name}_crop_fake.png", isVector = True)
+                    data_utils.numpy_to_save_img(pl_img.astype(np.uint8), f"{DEMO_DATA_DIR}/pl_img/{img_name}_{w}_{h}.png", isVector = True)
+                    data_utils.numpy_to_save_img(real_img.astype(np.uint8), f"{DEMO_DATA_DIR}/rl_img/{img_name}_{w}_{h}.png", isVector = True)
+                    data_utils.numpy_to_save_img(sitk_rgb_to_3channel_gray(real_img).astype(np.uint8), f"{DEMO_DATA_DIR}/xl_img/{img_name}_{w}_{h}.png", isVector = True)
+                data_utils.numpy_to_save_img(fake_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainA/{img_name}_{w}_{h}.png", isVector = True)
+                data_utils.numpy_to_save_img(real_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainB/{img_name}_{w}_{h}.png", isVector = True)
+                data_utils.numpy_to_save_img(expr_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainC/{img_name}_{w}_{h}.png", isVector = True)
+                data_utils.numpy_to_save_img(pl_img.astype(np.uint8), f"{DEMO_DATA_DIR}/trainD/{img_name}_{w}_{h}.png", isVector = True)
+                data_utils.numpy_to_save_img(sitk_rgb_to_3channel_gray(real_img).astype(np.uint8), f"{DEMO_DATA_DIR}/trainE/{img_name}_{w}_{h}.png", isVector = True)
+        # data_utils.numpy_to_save_img(data_utils.combine_2d_image_from_list(fake_numpy_crops_list), f"{DEMO_DATA_DIR}/{img_name}_crop_fake.png", isVector = True)
         # break
+        
+def make_nissl_atals_dataset(win_size:int = 1024, stride:int = 768, discard_val:int = 240, discard_ratio:float = 0.05) -> None:
+    altas_img_lis = data_utils.make_dataset(ALTAS_IMG_DIR)
+    save_dir = f"/home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/altas_image/patch_{win_size}_{stride}"
+    os.makedirs(save_dir, exist_ok = True)
+    for ix in range(len(altas_img_lis)):
+        patch_idx = 0
+        img_name = os.path.split(altas_img_lis[ix])[1].split(".")[0]
+        print(f"{ix}th: {img_name}")
+        img_numpy_crops_list = data_utils.crop_2d_image_to_list(data_utils.sitk_to_numpy(sitk.ReadImage(altas_img_lis[ix])), win_size, stride)
+        for row in img_numpy_crops_list:
+            for patch in row:
+                if patch.mean() > discard_val: 
+                    continue 
+                non_white_ratio = (patch < discard_val).mean()
+                if non_white_ratio < discard_ratio: 
+                    continue
+                save_name = f"{save_dir}/patch_{patch_idx:06d}_{img_name}.png"
+                data_utils.numpy_to_save_img(patch, save_name, isVector = True)
+                patch_idx += 1
+    
+    save_dir = f"{DEMO_DATA_DIR}/patch_{win_size}_{stride}"
+    os.makedirs(save_dir, exist_ok = True)
+    raw_img_list= data_utils.make_dataset(f"{IMG_BASIC_DIR}/{DEMO_SECID}/raw")
+    for ix in range(len(raw_img_list)):
+        patch_idx = 0
+        img_name = os.path.split(raw_img_list[ix])[1].split(".")[0]
+        print(f"{ix}th: {img_name}")
+        img_numpy_crops_list = data_utils.crop_2d_image_to_list(data_utils.sitk_to_numpy(sitk.ReadImage(raw_img_list[ix])), win_size, stride)
+        for row in img_numpy_crops_list:
+            for patch in row:
+                if patch.mean() > discard_val: 
+                    continue 
+                non_white_ratio = (patch < discard_val).mean()
+                if non_white_ratio < discard_ratio: 
+                    continue
+                save_name = f"{save_dir}/patch_{patch_idx:06d}_{img_name}.png"
+                data_utils.numpy_to_save_img(patch, save_name, isVector = True)
+                patch_idx += 1
+
 if __name__ == "__main__":
     # print(data_utils.make_dataset(f"{IMG_BASIC_DIR}/{DEMO_SECID}/expression"))
-    make_demo_dataset()
+    make_nissl_atals_dataset()
     # raw_img = sitk.ReadImage("/home/t207/Lab_Data_preproc2/allen_data/code/Translation-Different-ISH-Slice/dataset/demo/71112015_raw.jpg")
     # expr_img = sitk.ReadImage("/home/t207/Lab_Data_preproc2/allen_data/code/Translation-Different-ISH-Slice/dataset/demo/71112015_expr.jpg")
     # sitk.WriteImage(simple_synthesis_remove_expr_UVstyle_images(raw_img, expr_img, True, False), f"./71112015_raw_interpolated_cpu_otsu.png")

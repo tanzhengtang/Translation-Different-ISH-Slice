@@ -3,7 +3,7 @@ import torch
 
 class Pixel2PixelInterface(networks.GanCommonModel):
     def __init__(self, **kwargs):
-        super().__init__( **kwargs)
+        super().__init__(**kwargs)
         self.automatic_optimization = False
         self.save_hyperparameters()
         self.hparams.netD_params['input_nc'] = self.hparams.netG_params['input_nc'] + self.hparams.netG_params['output_nc']

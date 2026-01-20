@@ -3,7 +3,7 @@ import itertools
 from model import networks
 
 class CycleGanInterface(networks.GanCommonModel):
-    def __init__(self, **kwargs):
+    def __init__(self, direction:str, pool_image_size:int, **kwargs):
         super().__init__(**kwargs)
         self.automatic_optimization = False
         self.save_hyperparameters()
@@ -38,7 +38,6 @@ class CycleGanInterface(networks.GanCommonModel):
         lambda_B = 10.0
         criterionIdt = torch.nn.L1Loss()
         criterionCycle = torch.nn.L1Loss()
-        # Identity loss
         if lambda_idt > 0:
             idt_A = self.netG_A(self.real_B)
             loss_idt_A = criterionIdt(idt_A, self.real_B) * lambda_B * lambda_idt
@@ -52,7 +51,7 @@ class CycleGanInterface(networks.GanCommonModel):
         loss_cycle_A = criterionCycle(self.rec_A, self.real_A) * lambda_A
         loss_cycle_B = criterionCycle(self.rec_B, self.real_B) * lambda_B
         loss_G = loss_G_A + loss_G_B + loss_cycle_A + loss_cycle_B + loss_idt_A + loss_idt_B
-        loss_G.backward()
+        self.manual_backward(loss_G)
         return loss_G_A, loss_G_B, loss_G
 
     def backward_D_basic(self, netD, real, fake):
@@ -61,7 +60,7 @@ class CycleGanInterface(networks.GanCommonModel):
         pred_fake = netD(fake.detach())
         loss_D_fake = self.criterionGAN(pred_fake, False)
         loss_D = (loss_D_real + loss_D_fake) * 0.5
-        loss_D.backward()
+        self.manual_backward(loss_D)
         return loss_D
 
     def backward_D(self):
@@ -78,6 +77,7 @@ class CycleGanInterface(networks.GanCommonModel):
     def training_step(self, batch, batch_idx):
         self.real_A, self.real_B = batch
         g_opt, d_opt = self.optimizers()
+        sch_g, sch_d = self.lr_schedulers()
         self.fake_B = self.netG_A(self.real_A)
         self.rec_A = self.netG_B(self.fake_B)
         self.fake_A = self.netG_B(self.real_B)
@@ -92,7 +92,9 @@ class CycleGanInterface(networks.GanCommonModel):
         d_opt.zero_grad()  
         loss_D_A, loss_D_B = self.backward_D()
         d_opt.step()
-
+        if self.trainer.is_last_batch:
+            sch_d.step()
+            sch_g.step()
         self.log_dict({"loss_G": loss_G, "loss_G_A": loss_G_A, "loss_G_B":loss_G_B, "loss_D_A":loss_D_A, "loss_D_B":loss_D_B}, prog_bar = True, on_step = True, logger = True)
         return loss_G
 
@@ -102,14 +104,14 @@ class CycleGanInterface(networks.GanCommonModel):
         d_opt = torch.optim.Adam(itertools.chain(self.netD_A.parameters(), self.netD_B.parameters()), lr = self.hparams.lr, weight_decay = weight_decay)
         if self.hparams.lr_scheduler is not None:
             if self.hparams.lr_scheduler == 'step':
-                torch.optim.lr_scheduler.StepLR(g_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
-                torch.optim.lr_scheduler.StepLR(d_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
+                scheduler_g = torch.optim.lr_scheduler.StepLR(g_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
+                scheduler_d = torch.optim.lr_scheduler.StepLR(d_opt, step_size = self.hparams.lr_decay_steps, gamma = self.hparams.lr_decay_rate)
             elif self.hparams.lr_scheduler == 'cosine':
-                torch.optim.lr_scheduler.CosineAnnealingLR(g_opt, T_max = self.hparams.lr_decay_steps, eta_min = self.hparams.lr_decay_min_lr)
-                torch.optim.lr_scheduler.CosineAnnealingLR(d_opt, T_max = self.hparams.lr_decay_steps, eta_min = self.hparams.lr_decay_min_lr)
+                scheduler_g = torch.optim.lr_scheduler.CosineAnnealingLR(g_opt, T_max = self.hparams.lr_decay_steps, eta_min = self.hparams.lr_decay_min_lr)
+                scheduler_d = torch.optim.lr_scheduler.CosineAnnealingLR(d_opt, T_max = self.hparams.lr_decay_steps, eta_min = self.hparams.lr_decay_min_lr)
             else:
                 raise ValueError('Invalid lr_scheduler type!')
-        return g_opt, d_opt
+        return [g_opt, d_opt], [{"scheduler": scheduler_g, "interval": "step", "frequency": 1, "name": "lr_vae"}, {"scheduler": scheduler_d, "interval": "step", "frequency": 1, "name": "lr_disc"}]
 
     def configure_loss(self):
         loss = self.hparams.loss_function.lower()

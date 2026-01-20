@@ -1,0 +1,132 @@
+seed_everything: 77
+trainer:
+  accelerator: gpu
+  strategy: auto
+  devices: [0]
+  num_nodes: 1
+  precision: bf16-mixed
+
+  callbacks:
+    - class_path: model.callback.SaveMiddleCallback
+      init_args:
+        check_func_name: cgan_check
+        check_func_params: 
+          source_img_path: /home/t207/lab_data_preproc4/allen_data/img_data/71249740/raw/71111610.jpg
+          fake_img_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/71111610.png
+          win_size: 1024
+          stride: 768
+
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # monitor: g_loss
+          monitor: SSIM
+          mode: min
+          save_top_k: 2
+          # filename: 'min-{epoch}-{g_loss:.4f}'
+          filename: 'min-{epoch}-{SSIM:.4f}'
+          save_weights_only: True
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        # monitor: g_loss
+          monitor: SSIM
+          mode: min
+          save_top_k: -1
+          every_n_epochs: 10
+          save_weights_only: True
+          # filename: '{epoch}-{g_loss:.4f}'
+          filename: 'min-{epoch}-{SSIM:.4f}'
+
+  # logger: True
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: Cuda
+      name: cgan_test
+      save_dir: ./lightning_logs
+      log_model: false
+
+  fast_dev_run: false
+  check_val_every_n_epoch: 5
+  log_every_n_steps: 10
+  max_epochs: 100
+  min_epochs: null
+  # inference_mode: true
+  # max_steps: -1
+  # min_steps: null
+  # max_time: null
+  # limit_train_batches: null
+  # limit_val_batches: null
+  # limit_test_batches: null
+  # limit_predict_batches: null
+  # overfit_batches: 0.0
+  # val_check_interval: 2
+  # num_sanity_val_steps: null
+  # enable_checkpointing: null
+  # enable_progress_bar: null
+  # enable_model_summary: null
+  # accumulate_grad_batches: 1
+  # gradient_clip_val: null
+  # gradient_clip_algorithm: null
+  # deterministic: null
+  # benchmark: null
+
+  # use_distributed_sampler: true
+  # profiler: null
+  # detect_anomaly: false
+  # barebones: false
+  # plugins: null
+  # sync_batchnorm: false
+  # reload_dataloaders_every_n_epochs: 0
+  # default_root_dir: null
+  # model_registry: null
+
+model:
+  # class_path: model.GanInterface
+  # class_path: model.networks.GanCommonModel
+  # class_path: model.cgan_interface.CycleGanInterface
+  class_path: model.cgan_interface.CycleGanInterface
+  init_args:
+    loss_function: mse
+    # loss_function: bcewg
+    lr: 0.0001
+    lr_scheduler: cosine
+    # lr_scheduler: step
+    lr_decay_steps: 10
+    lr_decay_min_lr: 1e-6
+    lr_decay_rate: 0.01
+    weight_decay: 0.001
+    val_metric_names: [MSE, MS_SSIM, SSIM]
+    direction: AtoB
+    pool_image_size: 100
+
+    netG_name: ResnetGenerator2D
+    netG_params:
+      input_nc: 3
+      output_nc: 3
+      ngf: 64
+      drop_rate: 0.1
+      n_blocks: 9
+      norm_layer: instance
+
+    # netD_name: SpectralNormalizationDiscriminator2D
+    netD_name: NLayerDiscriminator2D
+    netD_params:
+      input_nc: 3
+      ndf: 8
+      n_layers: 3
+      norm_layer: instance
+  
+data:
+  class_path: data.data_interface.DataInterface
+  init_args:
+    dataset: AlignedDataSet
+    dataset_params:
+      mB_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/altas_image/patch_1024_768
+      mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/patch_1024_768
+      downsample_factor: 1
+    batch_size: 1
+
+# ckpt_path: null

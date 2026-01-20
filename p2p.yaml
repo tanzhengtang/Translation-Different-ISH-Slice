@@ -8,6 +8,12 @@ trainer:
 
   callbacks:
     - class_path: model.callback.SaveMiddleCallback
+      init_args:
+        combine_img_params:
+          val_img_dir: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/trainE
+          output_img_dir: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset
+          base_name: 71111405
+
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
@@ -36,7 +42,7 @@ trainer:
     class_path: lightning.pytorch.loggers.WandbLogger
     init_args:
       project: Cuda
-      name: p2pt_71249739_smooth_label_noise_spn_disc
+      name: p2pt_71249739_slnsd_test
       save_dir: ./lightning_logs
       log_model: false
 

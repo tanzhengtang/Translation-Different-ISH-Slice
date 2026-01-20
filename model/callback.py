@@ -5,9 +5,33 @@ import wandb
 import numpy as np
 from data import data_utils
 
+def cgan_check(wb, pl_module, source_img_path, fake_img_path, win_size, stride) -> None:
+    import SimpleITK as sitk
+    import os 
+    img_np = data_utils.sitk_to_numpy(sitk.ReadImage(source_img_path))
+    fake_img_dir, fake_img_fn = os.path.split(fake_img_path)
+    sitk_np_patchs = data_utils.crop_2d_image_to_list(img_np, win_size, stride)
+    tensor_crop_patchs = []
+    for rows in sitk_np_patchs:
+        np_patchs = []
+        for col in rows:
+            col = np.moveaxis(col, -1, 0)
+            np_patchs.append(data_utils.torch_tensor_to_numpy(data_utils.numpy_to_torch_tensor(col, pl_module)))
+        tensor_crop_patchs.append(np_patchs)
+    data_utils.numpy_to_save_img(data_utils.combine_2d_image_with_overlap(tensor_crop_patchs, stride, img_np.shape[0:2]), f"{fake_img_dir}/{wb.version}_{pl_module.trainer.current_epoch}_{fake_img_fn}", isVector = True)
+    pl_module.train()
+        
+def p2p_check(wb, pl_module, val_img_dir, output_img_dir, base_name) -> None:
+    data_utils.sitk_reconstruct_from_dir(val_img_dir, f"{output_img_dir}/{base_name}_{wb.version}_{pl_module.trainer.current_epoch}.png", str(base_name), ".png", pl_module)
+    pl_module.train()
+
+CHECK_FUNC_DICT  = dict(cgan_check = cgan_check, p2p_check = p2p_check)
+
 class SaveMiddleCallback(Callback):
-    def __init__(self, log_frequency: int = 1):
+    def __init__(self, log_frequency: int = 1, check_func_name:str = "", check_func_params:dict = {}):
+        self.check_func = CHECK_FUNC_DICT[check_func_name] if check_func_name else None
         self.log_frequency = log_frequency
+        self.check_func_params = check_func_params
 
     @staticmethod
     def _wb_logger(trainer) -> WandbLogger | None:
@@ -18,32 +42,11 @@ class SaveMiddleCallback(Callback):
             return next((l for l in lg if isinstance(l, WandbLogger)), None)
         return None
 
-    def _slice_images(self, vol: torch.Tensor) -> torch.Tensor:
-        D = vol.shape[-1]
-        mid_idx = D // 2
-        return vol[..., mid_idx]
-
-    def _get_image_pair(self, batch: dict, outputs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        if isinstance(batch,dict):
-            x_0 =  batch.get("image_x_0")
-        else:
-            x_0 = batch[0].get("image_x_0")
-        return x_0, outputs
-
-    def _log_3d_comparison(self, wb: WandbLogger, x_0: torch.Tensor, preds: torch.Tensor) -> None:
-        gt_slice = self._slice_images(x_0[0].squeeze(0).cpu())
-        pd_slice = self._slice_images(preds[0].squeeze(0).cpu())
-        pair = torch.concat([pd_slice,gt_slice],dim=1)
-        wb.experiment.log({"val_pair": wandb.Image(pair.numpy(), caption="prediction---------ground_truth")})
-
-    def _log_2d_comparison(self, wb: WandbLogger, input_x: torch.Tensor, input_y: torch.Tensor,preds: torch.Tensor) -> None:
-        # gs_slice = np.moveaxis(input_y.squeeze(0).detach().to(torch.float).cpu().numpy(), 0, -1)
-        # gt_slice = np.moveaxis(input_x.squeeze(0).detach().to(torch.float).cpu().numpy(), 0, -1)
-        # pd_slice = np.moveaxis(preds.squeeze(0).detach().to(torch.float).cpu().numpy(), 0, -1)
+    def _log_2d_comparison(self, wb:WandbLogger, input_x:torch.Tensor, input_y:torch.Tensor, preds:torch.Tensor) -> None:
         gs_slice, gt_slice, pd_slice = data_utils.torch_tensor_to_numpy(input_x[0,::,]), data_utils.torch_tensor_to_numpy(input_y[0,::,]), data_utils.torch_tensor_to_numpy(preds[0,::,])
         pair = np.concat([pd_slice, gt_slice, gs_slice], axis = 1)
         wb.experiment.log({"val_pair": wandb.Image(pair.astype(np.uint8), caption="prediction---------ground_truth")})
-
+    
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, *_) -> None:
         if batch_idx != 0:
             return
@@ -51,7 +54,6 @@ class SaveMiddleCallback(Callback):
         if wb is None:
             return
         input_x, input_y, preds = batch[0], batch[1], outputs
-        if input_x.ndim == 5:
-            self._log_3d_comparison(wb, input_x, input_y, preds)
-        else:
-            self._log_2d_comparison(wb,input_x, input_y, preds)
+        self._log_2d_comparison(wb,input_x, input_y, preds)
+        if self.check_func is not None:
+            self.check_func(wb, pl_module, **self.check_func_params)

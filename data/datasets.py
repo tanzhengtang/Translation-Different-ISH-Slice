@@ -5,10 +5,10 @@ from data import data_utils
 
 # TODO. add the data augmentation func
 class CommonDataSet(torch.utils.data.Dataset):
-    def __init__(self, dataset_path:str, mA_name:str, mB_name:str, downsample_factor:int = 0):
+    def __init__(self, mA_path:str, mB_path:str, downsample_factor:int = 0):
         super().__init__()
-        self.mA_list = sorted(data_utils.make_dataset(f"{dataset_path}/{mA_name}"))
-        self.mB_list =  sorted(data_utils.make_dataset(f"{dataset_path}/{mB_name}"))
+        self.mA_list = sorted(data_utils.make_dataset(f"{mA_path}"))
+        self.mB_list = sorted(data_utils.make_dataset(f"{mB_path}"))
         self.downsample_factor = downsample_factor
     
     def _get_image_index(self, index):
@@ -26,7 +26,7 @@ class CommonDataSet(torch.utils.data.Dataset):
         return data_utils.sitk_to_torch_tensor(A_img), data_utils.sitk_to_torch_tensor(B_img)
     
     def __len__(self):
-        return np.max([len(self.mA_list), len(self.mB_list)])
+        return np.min([len(self.mA_list), len(self.mB_list)])
 
 class UnalignedDataSet(CommonDataSet):
     def __init__(self, **kwargs):

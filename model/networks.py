@@ -386,7 +386,7 @@ class GanCommonModel(LightningModule):
             for metric_name in self.hparams.val_metric_names:
                 val_loss_dict[metric_name] = METRICS_CLASS_DICT[metric_name](val_g_y.detach(), y)
         if val_loss_dict:
-            self.log_dict(val_loss_dict, prog_bar = True, on_step = True, logger = True, sync_dist = True)
+            self.log_dict(val_loss_dict, prog_bar = False, on_step = True, logger = True, sync_dist = True)
         return val_g_y.detach()
     
     def test_step(self, batch, batch_idx):
