@@ -1,0 +1,119 @@
+seed_everything: 77
+
+trainer:
+  accelerator: gpu
+  strategy: auto
+  devices: [0]
+  num_nodes: 1
+  precision: bf16-mixed
+
+  fast_dev_run: true
+  check_val_every_n_epoch: 5
+  log_every_n_steps: 10
+  max_epochs: 100
+  min_epochs: null
+
+  callbacks:
+    - class_path: model.callback.OverrideEpochCallback
+      init_args:
+        start_epoch: 0
+    - class_path: model.callback.SaveMiddleCallback
+      init_args:
+        check_func_name: cgan_check
+        check_func_params: 
+          source_img_path: /home/t207/lab_data_preproc4/allen_data/img_data/71249740/raw/71111610.jpg
+          fake_img_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/71111610.png
+          win_size: 1024
+          stride: 768
+    - class_path: lightning.pytorch.callbacks.LearningRateMonitor
+      init_args:
+        logging_interval: step
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+          monitor: SSIM
+          mode: min
+          save_top_k: 2
+          filename: 'min-{epoch}-{SSIM:.4f}'
+          save_weights_only: True
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+          monitor: SSIM
+          mode: min
+          save_top_k: -1
+          every_n_epochs: 10
+          save_weights_only: True
+          filename: 'min-{epoch}-{SSIM:.4f}'
+
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: Cuda
+      name: translate_test
+      save_dir: ./lightning_logs
+      log_model: false
+
+model:
+  class_path: model.translate_interface.IntegratedGANModel
+  init_args:
+    patch_size: 512 
+    stride: 512
+    p2p_start_train_epoch: 3
+
+    cgan_params:
+      loss_function: mse
+      lr: 0.0001
+      lr_scheduler: cosine
+      lr_decay_steps: 10
+      lr_decay_min_lr: 1e-6
+      lr_decay_rate: 0.01
+      weight_decay: 0.001
+      val_metric_names: [MSE, MS_SSIM, SSIM]
+      direction: AtoB
+      pool_image_size: 100
+      netG_name: ResnetGenerator2D
+      netG_params:
+        input_nc: 3
+        output_nc: 3
+        ngf: 64
+        drop_rate: 0.1
+        n_blocks: 9
+        norm_layer: instance
+      netD_name: NLayerDiscriminator2D
+      netD_params:
+        input_nc: 3
+        ndf: 8
+        n_layers: 3
+        norm_layer: instance
+
+    p2p_params:
+      loss_function: mse
+      lr: 0.0001
+      lr_scheduler: cosine
+      lr_decay_steps: 10
+      lr_decay_min_lr: 1e-6
+      lr_decay_rate: 0.01
+      weight_decay: 0.001
+      val_metric_names: [MSE, MS_SSIM, SSIM]
+      netG_name: ResnetGenerator2D
+      netG_params:
+        input_nc: 3
+        output_nc: 3
+        ngf: 128
+        drop_rate: 0.1
+        n_blocks: 9
+        norm_layer: instance
+      netD_name: SpectralNormalizationDiscriminator2D
+      netD_params:
+        input_nc: 3
+        ndf: 8
+        n_layers: 2
+
+data:
+  class_path: data.data_interface.DataInterface
+  init_args:
+    dataset: AlignedDataSet
+    dataset_params:
+      mB_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/altas_image/patch_1024_768
+      mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/patch_1024_768
+      downsample_factor: 1
+    batch_size: 1

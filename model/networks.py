@@ -25,6 +25,8 @@ def get_2Dnorm_layer(norm_layer:str, dim:int) -> torch.nn.Module:
         norm_layer = torch.nn.InstanceNorm2d(dim) 
     elif norm_layer == "batch":
         norm_layer = torch.nn.BatchNorm2d(dim)
+    elif norm_layer == "group":
+        norm_layer = torch.nn.GroupNorm(1, dim)
     else:
         raise(f"No such {norm_layer} norm layer")
     return norm_layer
@@ -298,27 +300,25 @@ METRICS_CLASS_DICT = dict(MSE = torchmetrics.functional.mean_squared_error,
                           MS_SSIM = torchmetrics.functional.multiscale_structural_similarity_index_measure)
 
 class GanCommonModel(LightningModule):
-    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, val_metric_names:list = []):
+    def __init__(self, netG_name:str, netD_name:str, netG_params:dict, netD_params:dict, loss_function:str, weight_decay:float, lr:float, lr_scheduler:str, lr_decay_steps:float, lr_decay_min_lr:float, lr_decay_rate:float, val_metric_names:list = [], load_from_checkpoint:str = ""):
         super().__init__()
         self.automatic_optimization = False
         self.save_hyperparameters()
         self.load_networks()
         self.configure_loss()
-    
+        self.load_checkpoint()
+
     def forward(self, x):
         return self.netG(x)
     
     def criterionGAN(self, input_tensor:torch.Tensor, target_is_real:bool, use_smoothing:bool = False):
         if use_smoothing:
-            if target_is_real:
-                target_tensor = 0.7 + 0.5 * torch.rand_like(input_tensor, device=self.device)
-            else:
-                target_tensor = 0.1 * torch.rand_like(input_tensor, device=self.device)
+            weight = 0.7 if target_is_real else 0.1
+            bias = 0.7 * target_is_real 
         else:
-            if target_is_real:
-                target_tensor = torch.ones_like(input_tensor, device=self.device)
-            else:
-                target_tensor = torch.zeros_like(input_tensor, device=self.device)
+            bias = 0
+            weight = 1
+        target_tensor = bias + weight * torch.rand_like(input_tensor, device=self.device)
         return self.loss_function(input_tensor, target_tensor)
     
     def configure_loss(self):
@@ -352,10 +352,12 @@ class GanCommonModel(LightningModule):
     def load_networks(self):
         self.netG = NETWORKS_CLASS_DICT[self.hparams.netG_name](**self.hparams.netG_params)
         self.netD = NETWORKS_CLASS_DICT[self.hparams.netD_name](**self.hparams.netD_params)
-        if hasattr(self.hparams.netG_params, 'netG_ckpt_path'):
-            self.netG.load_from_ckpt(self.hparams.netG_params['netG_ckpt_path'])
-        if hasattr(self.hparams.netD_params, 'netD_ckpt_path'):
-            self.netD.load_from_ckpt(self.hparams.netD_params['netD_ckpt_path'])
+    
+    def load_checkpoint(self):
+        if self.hparams.load_from_checkpoint:
+            print(f"load checkpoint from {self.hparams.load_from_checkpoint}")
+            checkpoint = torch.load(self.hparams.load_from_checkpoint, 'cpu')
+            self.load_state_dict(checkpoint['state_dict'])
     
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -388,6 +390,10 @@ class GanCommonModel(LightningModule):
         if val_loss_dict:
             self.log_dict(val_loss_dict, prog_bar = False, on_step = True, logger = True, sync_dist = True)
         return val_g_y.detach()
+    
+    def predict_step(self, batch, batch_idx):
+        real_A = batch[0]
+        return self.forward(real_A)
     
     def test_step(self, batch, batch_idx):
         return

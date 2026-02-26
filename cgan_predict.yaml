@@ -1,6 +1,6 @@
 seed_everything: 77
 # weights_only: true
-# ckpt_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/lightning_logs/Cuda/ws2dcl6m/checkpoints/min-epoch=19-SSIM=0.3094.ckpt
+ckpt_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/lightning_logs/Cuda/ws2dcl6m/checkpoints/min-epoch=109-SSIM=0.2928.ckpt
 
 trainer:
   accelerator: gpu
@@ -19,23 +19,14 @@ trainer:
     class_path: lightning.pytorch.loggers.WandbLogger
     init_args:
       project: Cuda
-      name: cgan_test_94
+      name: ws2dcl6m
       save_dir: ./lightning_logs
       log_model: false
 
   callbacks:
-    - class_path: model.callback.OverrideEpochCallback
+    - class_path: model.callback.ImagePredictionWriter
       init_args:
-        start_epoch: 0
-    - class_path: model.callback.SaveMiddleCallback
-      init_args:
-        check_func_name: cgan_check
-        check_func_params: 
-          # source_img_path: /home/t207/lab_data_preproc4/allen_data/img_data/71249740/raw/71111610.jpg
-          source_img_path: /home/t207/lab_data_preproc4/allen_data/img_data/71249739/raw/71111459.jpg
-          fake_img_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/71111459.png
-          win_size: 1024
-          stride: 768
+        output_dir: "/home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/inference_output/cgan/ws2dcl6m_patch_1024_768/"
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
@@ -126,18 +117,16 @@ model:
     netD_name: NLayerDiscriminator2D
     netD_params:
       input_nc: 3
-      ndf: 8
+      ndf: 64
       n_layers: 3
       norm_layer: instance
 
 data:
   class_path: data.data_interface.DataInterface
   init_args:
-    dataset: AlignedDataSet
-    data_rate: [0.1, 0.1, 0.8]
+    dataset: PredictDataSet
     dataset_params:
       mB_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/altas_image/patch_1024_768
-      mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/patch_1024_768
-      # mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/patch_1024_768
+      mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/patch_1024_768
       downsample_factor: 1
     batch_size: 1

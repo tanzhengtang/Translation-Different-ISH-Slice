@@ -2,9 +2,23 @@ import torch
 import itertools
 from model import networks
 
-class CycleGanInterface(networks.GanCommonModel):
-    def __init__(self, direction:str, pool_image_size:int, **kwargs):
+class PatchCganInterface(networks.GanCommonModel):
+    def __init__(self, direction:str, pool_image_size:int, patch_size = 512, stirde = 512, **kwargs):
         super().__init__(**kwargs)
+
+    def filter_patches(self, patches_A, patches_B, threshold:int = 0.1):
+        stds = patches_A.view(patches_A.size(0), -1).std(dim=1)
+        valid_indices = stds > threshold
+        if valid_indices.sum() == 0:
+            return None, None
+        return patches_A[valid_indices], patches_B[valid_indices]
+
+    def tensor_to_patches(self, img_tensor):
+        b, c, h, w = img_tensor.shape
+        patches = img_tensor.unfold(2, self.patch_size, self.stride).unfold(3, self.patch_size, self.stride)
+        patches = patches.contiguous().view(b, c, -1, self.patch_size, self.patch_size)
+        patches = patches.permute(0, 2, 1, 3, 4).contiguous().view(-1, c, self.patch_size, self.patch_size)
+        return patches
 
     def load_networks(self):
         self.netG_A = networks.NETWORKS_CLASS_DICT[self.hparams.netG_name](**self.hparams.netG_params)
@@ -25,10 +39,11 @@ class CycleGanInterface(networks.GanCommonModel):
     def backward_G(self, batch):
         self.real_A, self.real_B = batch
         self.fake_B = self.netG_A(self.real_A)
-        self.rec_A = self.netG_B(self.fake_B)
         self.fake_A = self.netG_B(self.real_B)
         self.rec_B = self.netG_A(self.fake_A)
-        lambda_idt = 0.5 
+        self.rec_A = self.netG_B(self.fake_B)
+
+        lambda_idt = 0.5
         lambda_A = 10.0
         lambda_B = 10.0
         if lambda_idt > 0:

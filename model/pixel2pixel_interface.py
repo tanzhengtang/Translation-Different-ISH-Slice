@@ -4,13 +4,15 @@ import torch
 class Pixel2PixelInterface(networks.GanCommonModel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.automatic_optimization = False
-        self.save_hyperparameters()
-        self.hparams.netD_params['input_nc'] = self.hparams.netG_params['input_nc'] + self.hparams.netG_params['output_nc']
-        self.load_networks()
-        self.configure_loss()
 
-    def backward_G(self):
+    def load_networks(self):
+        self.hparams.netD_params['input_nc'] = self.hparams.netG_params['input_nc'] + self.hparams.netG_params['output_nc']
+        self.netG = networks.NETWORKS_CLASS_DICT[self.hparams.netG_name](**self.hparams.netG_params)
+        self.netD = networks.NETWORKS_CLASS_DICT[self.hparams.netD_name](**self.hparams.netD_params)
+
+    def backward_G(self, batch):
+        self.real_X, self.real_Y = batch
+        self.fake_Y = self.netG(self.real_X)
         fake_XY = torch.cat((self.real_X, self.fake_Y), 1)
         pred_fake = self.netD(fake_XY)        
         loss_G_GAN = self.criterionGAN(pred_fake, True)
@@ -30,18 +32,16 @@ class Pixel2PixelInterface(networks.GanCommonModel):
         return loss_D
     
     def training_step(self, batch, batch_idx):
-        self.real_X, self.real_Y = batch
-        self.fake_Y = self.netG(self.real_X)
         g_opt, d_opt = self.optimizers()
         sch_g, sch_d = self.lr_schedulers()
+        self.netD.requires_grad_(False)
+        g_opt.zero_grad()
+        loss_G = self.backward_G(batch)
+        g_opt.step()
         self.netD.requires_grad_(True)
         d_opt.zero_grad()
         loss_D = self.backward_D()
         d_opt.step()
-        self.netD.requires_grad_(False)
-        g_opt.zero_grad()
-        loss_G = self.backward_G()
-        g_opt.step()
         if self.trainer.is_last_batch:
             sch_d.step()
             sch_g.step()

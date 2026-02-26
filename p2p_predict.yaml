@@ -1,7 +1,4 @@
 seed_everything: 77
-# weights_only: true
-# ckpt_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/lightning_logs/Cuda/ws2dcl6m/checkpoints/min-epoch=19-SSIM=0.3094.ckpt
-
 trainer:
   accelerator: gpu
   strategy: auto
@@ -9,33 +6,10 @@ trainer:
   num_nodes: 1
   precision: bf16-mixed
 
-  fast_dev_run: false
-  check_val_every_n_epoch: 5
-  log_every_n_steps: 10
-  max_epochs: 100
-  min_epochs: null
-
-  logger:
-    class_path: lightning.pytorch.loggers.WandbLogger
-    init_args:
-      project: Cuda
-      name: cgan_test_94
-      save_dir: ./lightning_logs
-      log_model: false
-
   callbacks:
-    - class_path: model.callback.OverrideEpochCallback
+    - class_path: model.callback.ImagePredictionWriter
       init_args:
-        start_epoch: 0
-    - class_path: model.callback.SaveMiddleCallback
-      init_args:
-        check_func_name: cgan_check
-        check_func_params: 
-          # source_img_path: /home/t207/lab_data_preproc4/allen_data/img_data/71249740/raw/71111610.jpg
-          source_img_path: /home/t207/lab_data_preproc4/allen_data/img_data/71249739/raw/71111459.jpg
-          fake_img_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/71111459.png
-          win_size: 1024
-          stride: 768
+        output_dir: "/home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/inference_output/p2p"
     - class_path: lightning.pytorch.callbacks.LearningRateMonitor
       init_args:
         logging_interval: step
@@ -45,7 +19,7 @@ trainer:
           monitor: SSIM
           mode: min
           save_top_k: 2
-          # filename: 'min-{epoch}-{g_loss:.4f}'
+        # filename: 'min-{epoch}-{g_loss:.4f}'
           filename: 'min-{epoch}-{SSIM:.4f}'
           save_weights_only: True
     - class_path: lightning.pytorch.callbacks.ModelCheckpoint
@@ -56,14 +30,25 @@ trainer:
           save_top_k: -1
           every_n_epochs: 10
           save_weights_only: True
-          # filename: '{epoch}-{g_loss:.4f}'
+        # filename: '{epoch}-{g_loss:.4f}'
           filename: 'min-{epoch}-{SSIM:.4f}'
 
+  # logger: True
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      project: Cuda
+      name: p2pt_71249739_slnsd_test
+      save_dir: ./lightning_logs
+      log_model: false
 
-      # id: ws2dcl6m
-      # resume: must
-
+  fast_dev_run: false
+  check_val_every_n_epoch: 5
+  log_every_n_steps: 10
   # inference_mode: true
+  # fast_dev_run: false
+  max_epochs: 100
+  min_epochs: null
   # max_steps: -1
   # min_steps: null
   # max_time: null
@@ -97,9 +82,8 @@ model:
   # class_path: model.GanInterface
   # class_path: model.networks.GanCommonModel
   # class_path: model.cgan_interface.CycleGanInterface
-  class_path: model.cgan_interface.CycleGanInterface
+  class_path: model.pixel2pixel_interface.Pixel2PixelInterface
   init_args:
-    # load_from_checkpoint: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/lightning_logs/Cuda/ws2dcl6m/checkpoints/min-epoch=19-SSIM=0.3094.ckpt
     loss_function: mse
     # loss_function: bcewg
     lr: 0.0001
@@ -110,34 +94,37 @@ model:
     lr_decay_rate: 0.01
     weight_decay: 0.001
     val_metric_names: [MSE, MS_SSIM, SSIM]
-    direction: AtoB
-    pool_image_size: 100
 
+    # netG_name: ResnetGenerator3D
+    # netG_name: DesnetGenerator3D
     netG_name: ResnetGenerator2D
     netG_params:
       input_nc: 3
       output_nc: 3
-      ngf: 64
+      ngf: 128
       drop_rate: 0.1
       n_blocks: 9
       norm_layer: instance
 
-    # netD_name: SpectralNormalizationDiscriminator2D
-    netD_name: NLayerDiscriminator2D
+    netD_name: SpectralNormalizationDiscriminator2D
+    # netD_name: NLayerDiscriminator2D
+    # netD_name: NLayerDiscriminator3D
     netD_params:
       input_nc: 3
       ndf: 8
-      n_layers: 3
-      norm_layer: instance
+      n_layers: 2
+      # norm_layer: instance
+  
+  # netG_ckpt_path: ""
+  # netD_ckpt_path: ""
 
 data:
   class_path: data.data_interface.DataInterface
   init_args:
-    dataset: AlignedDataSet
-    data_rate: [0.1, 0.1, 0.8]
+    dataset: PredictDataSet
     dataset_params:
-      mB_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/altas_image/patch_1024_768
-      mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/patch_1024_768
-      # mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249740/patch_1024_768
+      mA_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/dataset/71249739/xl_img
       downsample_factor: 1
     batch_size: 1
+  
+ckpt_path: /home/t207/Lab_Data_preproc2/allen_data/code/software/Translation-Different-ISH-Slice/lightning_logs/Cuda/uugpav8t/checkpoints/min-epoch=89-SSIM=0.9485.ckpt
