@@ -14,7 +14,7 @@ class IntegratedGANModel(LightningModule):
         #     p2p_params = vars(p2p_params)
         # pixel2pixel_interface.Pixel2PixelInterface(**t2)
         # cgan_interface.CycleGanInterface(cgan_params)
-        test = pixel2pixel_interface.Pixel2PixelInterface(**t2)
+        test = pixel2pixel_interface.Pixel2PixelInterface(**kwargs)
         self.automatic_optimization = False 
         print(test)
         # self.load_models()
